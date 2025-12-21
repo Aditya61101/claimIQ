@@ -1,0 +1,17 @@
+@host = http://127.0.0.1:8000
+
+### create claim
+POST {{host}}/claims
+Content-Type: application/json
+
+{
+    "policy_id": "POL-2718",
+    "claim_type": "hospitalization",
+    "amount": 1500.00
+}
+
+### get item by id
+GET {{host}}/claims/1
+
+### get all claims
+GET {{host}}/claims

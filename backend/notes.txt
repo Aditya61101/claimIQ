@@ -1,0 +1,36 @@
+database engine: acts as db factory and manages the db connections, owns the connection pool and hence provides connection whenever needed. It is thread safe, should be created once.
+
+database session: a unit of work manager for efficient db operations. It wraps a db connection borrowed from engine's connection pool. Manages transaction, ensures consistency and is created per request hence is short lived.
+
+Lifecycle: -
+Application starts
+   ↓
+Engine created once
+   ↓
+Request comes in
+   ↓
+Session created (borrows connection from engine pool)
+   ↓
+ORM operations (query / insert / update)
+   ↓
+Commit or rollback
+   ↓
+Session closed (connection returned to pool)
+
+why should we create the DB session using a dependency instead of directly inside each route?
+“We use a dependency to manage DB sessions so that session creation, transaction scope, and cleanup are centralized and guaranteed.
+This avoids connection leaks, removes duplication, ensures one session per request, and makes the system testable and maintainable.
+FastAPI’s dependency system makes this explicit, but the pattern exists across all backend frameworks.”
+
+filter() → for expressions
+
+filter_by() → for simple equality via kwargs
+
+When and when not to use try except blocks: -
+We avoid blanket try/except blocks in FastAPI endpoints because the framework already handles exception propagation and cleanup. We only catch exceptions at boundaries where we can translate low-level errors into meaningful domain or HTTP errors, or when we need to ensure transactional integrity.
+
+Relationships give navigation, not automatic joins.
+Data is fetched lazily unless you explicitly eager-load it.
+Serialization is controlled by schemas, not ORM relationships.
+
+Square brackets are used for generics because they operate at the type level, allowing FastAPI and Pydantic to specialize schemas for validation and documentation.
