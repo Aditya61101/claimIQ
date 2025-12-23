@@ -45,7 +45,8 @@ def get_claim_by_id(id:int, db:Session = Depends(get_db)):
         claim_type=claim.claim_type,
         policy_id=claim.policy_id,
         amount=claim.amount,
-        status=claim.status,
+        processing_status=claim.processing_status,
+        decision_status=claim.decision_status,
         created_at=claim.created_at,
         documents=documents
     )

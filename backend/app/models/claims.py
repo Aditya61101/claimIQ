@@ -13,7 +13,19 @@ class Claim(Base):
     claim_type = Column(String, nullable=False)
     status = Column(String, default='pending')
     amount = Column(Float, nullable=False)
-    
+
+    processing_status = Column(
+        String,
+        nullable=False,
+        default="PENDING"
+    )
+
+    decision_status = Column(
+        String,
+        nullable=False,
+        default="NOT_DECIDED"
+    )
+
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc)

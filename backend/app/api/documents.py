@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-#Schemas
+# Schemas
 from app.schemas.documents import DocumentResponse
 from app.schemas.api_response import APIResponse
 # Models
@@ -13,6 +13,7 @@ from app.models.claims import Claim
 from app.models.documents import Document
 # services
 from app.services.document_extraction import extract_document
+from app.services.claim_status import update_claim_processing_status
 
 router = APIRouter(prefix='/claims', tags=['Documents'])
 
@@ -72,18 +73,19 @@ async def upload_files(
         saved_files.append(document)
     
     if not saved_files:
-        raise HTTPException(status_code=400, detail='Document type not provided or not supported.')
+        raise HTTPException(status_code=400, detail='No valid files were uploaded.')
 
     db.add_all(saved_files)
     db.commit()
+
+    update_claim_processing_status(claim_id, db)
 
     for doc in saved_files:
         db.refresh(doc)
 
         background_tasks.add_task(
             extract_document,
-            document_id=doc.id,
-            db=db
+            doc.id
         )
 
     return APIResponse(
