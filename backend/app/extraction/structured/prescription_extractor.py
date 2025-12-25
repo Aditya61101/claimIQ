@@ -1,4 +1,4 @@
-from app.extraction.regex_utils import extract
+from .regex_utils import extract
 
 def extract_prescription_data(text: str) -> dict:
     return {

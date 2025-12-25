@@ -2,8 +2,33 @@ from sqlalchemy.orm import Session
 from app.models.claims import Claim
 from app.models.documents import Document
 
+def build_action_required_payload(documents:list[Document]):
+    blocking = []
 
-def derive_processing_status(claim_id: int, db: Session) -> str:
+    for doc in documents:
+        if doc.status in {
+            "EXTRACTION_FAILED",
+            "VALIDATION_FAILED",
+            "VERIFICATION_FAILED"
+        }:
+            blocking.append({
+                "document_id": doc.id,
+                "document_name": doc.original_file_name,
+                "document_type": doc.document_type,
+                "status": doc.status,
+                "message": doc.error_message or "Document requires attention."
+            })
+
+    return {
+        "summary": "Some documents require attention before processing can continue.",
+        "blocking_documents": blocking,
+        "next_steps": [
+            "Re-upload the highlighted documents",
+            "Ensure all required details are visible and correct"
+        ]
+    }
+
+def derive_processing_status(claim:Claim, db: Session) -> str:
     """
     Pure function:
     Determines the correct processing_status for a claim.
@@ -11,31 +36,30 @@ def derive_processing_status(claim_id: int, db: Session) -> str:
 
     documents = (
         db.query(Document)
-        .filter(Document.claim_id == claim_id)
+        .filter(Document.claim_id == claim.id)
         .all()
     )
 
-    # Rule 1: No documents uploaded
+    # No documents uploaded
     if not documents:
-        return "PENDING"
+        return "DRAFT", None
 
     statuses = {doc.status for doc in documents}
 
-    # Rule 2: Any failure blocks the claim
-    if "FAILED" in statuses:
-        return "ACTION_REQUIRED"
+    # Any failure blocks the claim
+    if statuses & {
+        'EXTRACTION_FAILED',
+        'VALIDATION_FAILED',
+        'VERIFICATION_FAILED'
+    }:
+        return "ACTION_REQUIRED", build_action_required_payload(documents)
 
-    # Rule 3: Still processing or just uploaded
-    if "UPLOADED" in statuses or "PROCESSING" in statuses:
-        return "PROCESSING"
+    # Every document verified successfully, so we moved to claim level agents
+    if statuses == {"VERIFIED"}:
+        return "READY_FOR_EVALUATION", None
 
-    # Rule 4: Everything extracted successfully
-    if statuses == {"EXTRACTED"}:
-        return "READY_FOR_REVIEW"
-
-    # Safety fallback
-    return "PENDING"
-
+    # Still processing
+    return "DOCUMENT_PROCESSING", None
 
 def update_claim_processing_status(claim_id: int, db: Session) -> None:
     """
@@ -46,8 +70,9 @@ def update_claim_processing_status(claim_id: int, db: Session) -> None:
     if not claim:
         return
 
-    new_status = derive_processing_status(claim_id, db)
+    new_status, action_required = derive_processing_status(claim, db)
 
     if claim.processing_status != new_status:
         claim.processing_status = new_status
+        claim.action_required = action_required
         db.commit()

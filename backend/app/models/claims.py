@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from app.core.database import Base
 
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, JSON
 from sqlalchemy.orm import relationship
 
 class Claim(Base):
@@ -11,13 +11,14 @@ class Claim(Base):
     
     policy_id = Column(String, nullable=False)
     claim_type = Column(String, nullable=False)
-    status = Column(String, default='pending')
+    status = Column(String, default='pending') # stale column
     amount = Column(Float, nullable=False)
 
+    # DRAFT, DOCUMENT_PENDING, DOCUMENT_PROCESSING, ACTION_REQUIRED, READY_FOR_EVALUATION
     processing_status = Column(
         String,
         nullable=False,
-        default="PENDING"
+        default="DRAFT"
     )
 
     decision_status = Column(
@@ -25,6 +26,8 @@ class Claim(Base):
         nullable=False,
         default="NOT_DECIDED"
     )
+
+    action_required = Column(JSON, nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),

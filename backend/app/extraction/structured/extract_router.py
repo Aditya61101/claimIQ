@@ -1,6 +1,6 @@
-from app.extraction.bill_extractor import extract_bill_data
-from app.extraction.prescription_extractor import extract_prescription_data
-from app.extraction.report_extractor import extract_report_data
+from .bill_extractor import extract_bill_data
+from .prescription_extractor import extract_prescription_data
+from .report_extractor import extract_report_data
 
 from app.utils.constants import DocumentTypes
 

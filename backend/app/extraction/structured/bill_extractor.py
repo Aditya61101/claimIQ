@@ -1,4 +1,4 @@
-from app.extraction.regex_utils import extract
+from .regex_utils import extract
 from app.utils.constants import ClaimTypes
 
 def extract_bill_data(text:str, claim_type:str) -> dict:

@@ -18,14 +18,19 @@ class Document(Base):
     file_name = Column(String, nullable=False)
     original_file_name = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
+
+    # bills, prescriptions, reports
     document_type = Column(String, nullable=False)
     content_type = Column(String, nullable=False)
 
     source = Column(String, nullable=False, default='USER_UPLOAD')
+    # UPLOADED, EXTRACTED, EXTRACTION_FAILED VALIDATION_FAILED, VERIFICATION_FAILED, VERIFIED
     status = Column(String, nullable=False, default='UPLOADED')
+    processing_stage = Column(String, nullable=True)
     
     extracted_text = Column(Text, nullable=True)
     extracted_data = Column(JSON, nullable=True)
+    
     error_message = Column(Text, nullable=True)
     
     uploaded_at = Column(
