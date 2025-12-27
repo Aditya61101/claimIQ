@@ -1,4 +1,4 @@
-from app.orchestration.states import DocumentState
+from .states import DocumentState
 
 def document_router(state:DocumentState):
     """

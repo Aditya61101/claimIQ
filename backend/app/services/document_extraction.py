@@ -9,7 +9,7 @@ from app.services.claim_status import update_claim_processing_status
 from app.extraction.structured.extract_router import extract_structured_data
 from app.extraction.raw_unstructured.extract_router import extract_text
 
-from app.orchestration.document_graph import document_graph
+from app.orchestration.document.document_graph import document_graph
 
 def extract_document(document_id:int):
     """
@@ -52,6 +52,7 @@ def extract_document(document_id:int):
         document.processing_stage = None
         db.commit()
 
+        # INVOKE DOCUMENT LEVEL GRAPH
         document_graph.invoke({
             "document_id": document.id,
             "claim_id": claim.id

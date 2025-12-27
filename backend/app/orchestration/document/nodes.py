@@ -3,7 +3,7 @@ from app.models.documents import Document
 from app.agents.validation_agent.validation_agent import validate_document
 from app.agents.internal_verification_agent.internal_verification_agent import verify_document
 
-from app.orchestration.states import DocumentState
+from .states import DocumentState
 
 def document_validation_node(state:DocumentState) -> DocumentState:
     db = SessionLocal()

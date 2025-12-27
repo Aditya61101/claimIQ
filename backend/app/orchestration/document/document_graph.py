@@ -1,8 +1,8 @@
 from langgraph.graph import StateGraph, END
 
-from app.orchestration.states import DocumentState
-from app.orchestration.nodes import document_validation_node, document_verification_node
-from app.orchestration.routers import document_router
+from .states import DocumentState
+from .nodes import document_validation_node, document_verification_node
+from .routers import document_router
 
 def build_document_graph():
 
