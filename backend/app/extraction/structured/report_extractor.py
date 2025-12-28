@@ -1,4 +1,4 @@
-from .regex_utils import extract
+from app.utils.regex_utils import extract
 
 def extract_report_data(text: str) -> dict:
     return {

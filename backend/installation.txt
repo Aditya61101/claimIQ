@@ -7,6 +7,8 @@ sudo apt install -y tesseract-ocr poppler-utils
 # Download the Poppler for Windows from https://github.com/oschwartz10612/poppler-windows/releases/
 # Add the Tesseract and Poppler bin directories to your system PATH environment variable
 # Restart your command prompt or IDE to apply the changes
+
+## common verification step
 # Verify the installation by running the following commands in your command prompt or terminal:
 # tesseract --version
 # pdftoppm -v

@@ -24,8 +24,9 @@ class Document(Base):
     content_type = Column(String, nullable=False)
 
     source = Column(String, nullable=False, default='USER_UPLOAD')
-    # UPLOADED, EXTRACTED, EXTRACTION_FAILED VALIDATION_FAILED, VERIFICATION_FAILED, VERIFIED
+    # UPLOADED, EXTRACTED, EXTRACTION_FAILED, VALIDATION_FAILED, VERIFICATION_FAILED, VERIFIED
     status = Column(String, nullable=False, default='UPLOADED')
+    # EXTRACTION, VERIFICATION, VALIDATION
     processing_stage = Column(String, nullable=True)
     
     extracted_text = Column(Text, nullable=True)

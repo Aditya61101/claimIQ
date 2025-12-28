@@ -3,8 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, B
 from werkzeug.utils import secure_filename
 
 from sqlalchemy.orm import Session
-
+# core
 from app.core.database import get_db
+from app.core.security import require_roles, assert_claim_access
 # Schemas
 from app.schemas.documents import DocumentResponse
 from app.schemas.api_response import APIResponse
@@ -15,16 +16,16 @@ from app.models.documents import Document
 from app.services.document_extraction import extract_document
 from app.services.claim_status import update_claim_processing_status
 
-router = APIRouter(prefix='/claims', tags=['Documents'])
-
 UPLOAD_DIR = os.getenv("UPLOAD_DIR") # UPLOAD_DIR="uploads" in .env
-
 CLAIMS_UPLOAD_DIR = f"{UPLOAD_DIR}/claims"
+
+router = APIRouter(prefix='/claims', tags=['Documents'])
 
 @router.post("/{claim_id}/documents", response_model=APIResponse[list[DocumentResponse]])
 async def upload_files(
     claim_id: int, 
     background_tasks: BackgroundTasks,
+    current_user = Depends(require_roles("POLICY_HOLDER", "HOSPITAL")),
     document_type: str=Form(...), 
     files: list[UploadFile]=File(...),
     db: Session=Depends(get_db)
@@ -40,6 +41,9 @@ async def upload_files(
     
     if not files:
         raise HTTPException(status_code=400, detail='No files provided.')
+    
+    # for authorization purpose, raises exception if claim is not owned by current user
+    assert_claim_access(claim, current_user)
 
     claim_dir = os.path.join(CLAIMS_UPLOAD_DIR, str(claim_id), document_type)
     os.makedirs(claim_dir, exist_ok=True)
@@ -95,11 +99,18 @@ async def upload_files(
     )
 
 @router.get("/{claim_id}/documents", response_model=APIResponse[list[DocumentResponse]])
-def get_documents_for_claim_id(claim_id:int, db:Session=Depends(get_db)):
+def get_documents_for_claim_id(
+    claim_id:int,
+    current_user = Depends(require_roles("POLICY_HOLDER", "HOSPITAL")), 
+    db:Session=Depends(get_db)
+):
 
     claim = db.query(Claim).filter(Claim.id==claim_id).first()
     if not claim:
         raise HTTPException(status_code=404, detail='Claim not found')
+
+    # for authorization purpose, raises exception if claim is not owned by current user
+    assert_claim_access(claim, current_user)
 
     doc_list = db.query(Document).filter(Document.claim_id==claim_id).order_by(Document.uploaded_at.asc()).all()
 

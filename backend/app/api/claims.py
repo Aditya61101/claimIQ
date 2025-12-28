@@ -3,11 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import require_roles, assert_claim_access
 # Schemas
 from app.schemas.claims import ClaimCreate, ClaimResponse, ClaimWithDocumentsResponse
 from app.schemas.api_response import APIResponse
 # Models
+from app.models.users import User
 from app.models.claims import Claim
 from app.models.documents import Document
 from app.models.policies import Policy
@@ -21,7 +22,7 @@ router = APIRouter(prefix='/claims', tags=['Claims'])
 def create_claim(
     payload:ClaimCreate, 
     db:Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user:User = Depends(require_roles("POLICY_HOLDER", "HOSPITAL"))
 ):
 
     # validating policy
@@ -81,11 +82,18 @@ def create_claim(
     )
 
 @router.get('/{id}', response_model=APIResponse[ClaimWithDocumentsResponse])
-def get_claim_by_id(id:int, db:Session = Depends(get_db)):
+def get_claim_by_id(
+    id:int, 
+    db:Session = Depends(get_db),
+    current_user:User = Depends(require_roles("POLICY_HOLDER", "INSURER", "HOSPITAL"))
+):
     claim = db.query(Claim).filter(Claim.id==id).first()
 
     if not claim:
         raise HTTPException(status_code=404, detail='No claim exists for the given claim id')
+    
+    # for authorization purpose, raises exception if claim is not owned by current user
+    assert_claim_access(claim, current_user)
 
     documents = db.query(Document).filter(Document.claim_id==id).all()
 
@@ -93,7 +101,7 @@ def get_claim_by_id(id:int, db:Session = Depends(get_db)):
         id=claim.id,
         claim_type=claim.claim_type,
         policy_id=claim.policy_id,
-        amount=claim.claim_amount,
+        claim_amount=claim.claim_amount,
         processing_status=claim.processing_status,
         decision_status=claim.decision_status,
         created_at=claim.created_at,
@@ -107,9 +115,16 @@ def get_claim_by_id(id:int, db:Session = Depends(get_db)):
     )
 
 @router.get('/', response_model=APIResponse[list[ClaimResponse]])
-def get_claims(db:Session = Depends(get_db)):
-    print("entered post claims")
-    claims = db.query(Claim).all()
+def get_claims(
+    db:Session = Depends(get_db),
+    current_user:User = Depends(require_roles("POLICY_HOLDER", "INSURER", "HOSPITAL"))
+):
+    role = current_user.role
+    
+    if role == UserRoles.INSURER:
+        claims = db.query(Claim).all()
+    else:
+        claims = db.query(Claim).filter(Claim.created_by_id==current_user.id).all()
 
     return APIResponse(
         status=True,

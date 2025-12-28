@@ -2,15 +2,17 @@ from sqlalchemy.orm import Session
 from app.models.claims import Claim
 from app.models.documents import Document
 
+BLOCKING_STATUS = {
+    "EXTRACTION_FAILED",
+    "VALIDATION_FAILED",
+    "VERIFICATION_FAILED"
+}
+
 def build_action_required_payload(documents:list[Document]):
     blocking = []
 
     for doc in documents:
-        if doc.status in {
-            "EXTRACTION_FAILED",
-            "VALIDATION_FAILED",
-            "VERIFICATION_FAILED"
-        }:
+        if doc.status in BLOCKING_STATUS:
             blocking.append({
                 "document_id": doc.id,
                 "document_name": doc.original_file_name,
@@ -47,11 +49,7 @@ def derive_processing_status(claim:Claim, db: Session) -> str:
     statuses = {doc.status for doc in documents}
 
     # Any failure blocks the claim
-    if statuses & {
-        'EXTRACTION_FAILED',
-        'VALIDATION_FAILED',
-        'VERIFICATION_FAILED'
-    }:
+    if statuses & BLOCKING_STATUS:
         return "ACTION_REQUIRED", build_action_required_payload(documents)
 
     # Every document verified successfully, so we moved to claim level agents
@@ -63,7 +61,7 @@ def derive_processing_status(claim:Claim, db: Session) -> str:
 
 def update_claim_processing_status(claim_id: int, db: Session) -> None:
     """
-    Applies derived status to the claim if it has changed.
+    Applies derived processing_status and action_required to the claim.
     """
 
     claim = db.query(Claim).filter(Claim.id == claim_id).first()
@@ -72,7 +70,7 @@ def update_claim_processing_status(claim_id: int, db: Session) -> None:
 
     new_status, action_required = derive_processing_status(claim, db)
 
-    if claim.processing_status != new_status:
+    if claim.processing_status != new_status or claim.action_required != action_required:
         claim.processing_status = new_status
         claim.action_required = action_required
         db.commit()

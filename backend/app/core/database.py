@@ -22,7 +22,7 @@ SessionLocal = sessionmaker(
 # every ORM model will inherit from this
 Base = declarative_base()
 
-# DB dependency, yield so to have hook on request lifecycle for later cleanup using db.close()
+# DB dependency, 'yield' so to have a hook on request lifecycle for later cleanup using db.close()
 def get_db():
     db = SessionLocal()
     try:
