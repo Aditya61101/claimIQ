@@ -68,6 +68,7 @@ def extract_document(document_id: int):
         document_graph.invoke({
             "document_id": document.id,
             "claim_id": claim.id,
+            "document_status": document.status
         })
 
     except Exception as e:

@@ -15,13 +15,21 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM='HS256'
 
 def get_current_user(request:Request, db:Session=Depends(get_db)) -> User:
+    """
+    Extracts user from HTTPonly JWT cookie.
+    Raises 401 if authentication fails.
+    """
+
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
     try:
-        token = request.cookies.get("access_token")
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id:int = payload.get("sub")
+        user_id:int|None = payload.get("sub")
 
         if user_id is None:
-            raise HTTPException(status_code=401, detail='Invalid token')
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid token')
         
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Could not validate credentials')
@@ -29,14 +37,14 @@ def get_current_user(request:Request, db:Session=Depends(get_db)) -> User:
     user = db.query(User).filter(User.id==user_id, User.is_active==True).first()
 
     if not user:
-        raise HTTPException(status_code=401, detail='User not found')
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='User not found or inactive')
     
     return user
 
 def require_roles(*allowed_roles):
     def role_checker(user:User=Depends(get_current_user)):
         if not user or user.role not in allowed_roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='You are not allowed to perform this action')
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Insufficient permission')
         return user
     return role_checker
 

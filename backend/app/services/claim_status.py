@@ -2,6 +2,8 @@ from sqlalchemy.orm import Session
 from app.models.claims import Claim
 from app.models.documents import Document
 
+from app.orchestration.claim.claim_executor import invoke_claim_graph
+
 BLOCKING_STATUS = {
     "EXTRACTION_FAILED",
     "VALIDATION_FAILED",
@@ -74,3 +76,7 @@ def update_claim_processing_status(claim_id: int, db: Session) -> None:
         claim.processing_status = new_status
         claim.action_required = action_required
         db.commit()
+
+    # claim graph is invoked here
+    if new_status == 'READY_FOR_EVALUATION':
+        invoke_claim_graph(claim.id)
