@@ -1,4 +1,5 @@
 import os
+import logging
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, BackgroundTasks
 from werkzeug.utils import secure_filename
 
@@ -26,9 +27,10 @@ async def upload_files(
     claim_id: int, 
     background_tasks: BackgroundTasks,
     current_user = Depends(require_roles("POLICY_HOLDER", "HOSPITAL")),
-    document_type: str=Form(...), 
-    files: list[UploadFile]=File(...),
-    db: Session=Depends(get_db)
+    document_type: str = Form(...), 
+    replaces_document_id: int|None = Form(None),
+    files: list[UploadFile] = File(...),
+    db: Session = Depends(get_db)
 ):
 
     claim = db.query(Claim).filter(Claim.id==claim_id).first()
@@ -44,49 +46,73 @@ async def upload_files(
     
     # for authorization purpose, raises exception if claim is not owned by current user
     assert_claim_access(claim, current_user)
+    
+    old_doc = None
+    if replaces_document_id:
+        if len(files)!=1:
+            raise HTTPException(status_code=400, detail="Exactly one file must be uploaded when replacing a document")
+        
+        old_doc = db.query(Document).filter(Document.id==replaces_document_id, Document.claim_id==claim_id, Document.is_active==True).first()
+
+        if not old_doc:
+            raise HTTPException(status_code=400, detail="Invalid document to replace")
 
     claim_dir = os.path.join(CLAIMS_UPLOAD_DIR, str(claim_id), document_type)
     os.makedirs(claim_dir, exist_ok=True)
 
-    saved_files = []
+    new_documents = []
     error_files = []
-    for file in files:
-        if not file.filename:
-            continue
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(claim_dir, filename)
-        try:
-            with open(file_path, 'wb') as f:
-                while chunk:= await file.read(1024*1024):
-                    f.write(chunk)    
-        except Exception as e:
-            error_files.append({
-                'file_name': filename,
-                'error': str(e)
-            })
-            continue
-            # raise HTTPException(status_code=500, detail='Failed to upload file')
-        document = Document(
-            file_name=filename,
-            original_file_name=file.filename,
-            file_path=file_path,
-            content_type=file.content_type,
-            document_type=document_type,
-            claim_id=claim_id
-        )
-        saved_files.append(document)
-    
-    if not saved_files:
-        raise HTTPException(status_code=400, detail='No valid files were uploaded.')
+    try:
+        for file in files:
+            if not file.filename:
+                continue
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(claim_dir, filename)
+            try:
+                with open(file_path, 'wb') as f:
+                    while chunk:= await file.read(1024*1024):
+                        f.write(chunk)    
+            except Exception as e:
+                error_files.append({
+                    'file_name': filename,
+                    'error': str(e)
+                })
+                continue
+                # raise HTTPException(status_code=500, detail='Failed to upload file')
+            document = Document(
+                file_name=filename,
+                original_file_name=file.filename,
+                file_path=file_path,
+                content_type=file.content_type,
+                document_type=document_type,
+                claim_id=claim_id,
+                is_active=True
+            )
+            new_documents.append(document)
+        
+        if not new_documents:
+            raise HTTPException(status_code=400, detail='No valid files were uploaded.')
 
-    db.add_all(saved_files)
-    db.commit()
+        db.add_all(new_documents)
+        db.flush()
+
+        if old_doc:
+            old_doc.is_active = False
+            old_doc.status = 'REPLACED'
+            old_doc.replaced_by_doc_id = new_documents[0].id
+            
+            claim.processing_status = 'DRAFT'
+            claim.action_required = None
+            claim.decision_status = 'PENDING'
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, detail='Internal Server Error')
 
     update_claim_processing_status(claim_id, db)
 
-    for doc in saved_files:
-        db.refresh(doc)
-
+    # TODO: replace this with a task queue
+    for doc in new_documents:
         background_tasks.add_task(
             extract_document,
             doc.id
@@ -95,7 +121,7 @@ async def upload_files(
     return APIResponse(
         status=True,
         message='Files uploaded successfully',
-        data=saved_files
+        data=new_documents
     )
 
 @router.get("/{claim_id}/documents", response_model=APIResponse[list[DocumentResponse]])

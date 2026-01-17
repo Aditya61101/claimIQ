@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON, Boolean
 from datetime import datetime, timezone
 
 from app.core.database import Base
@@ -43,3 +43,6 @@ class Document(Base):
         DateTime(timezone=True),
         nullable=True
     )
+
+    is_active = Column(Boolean, nullable=False, default=True)
+    replaced_by_doc_id = Column(Integer, nullable=True)

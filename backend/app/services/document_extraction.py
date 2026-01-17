@@ -64,13 +64,6 @@ def extract_document(document_id: int):
 
         db.commit()
 
-        # ---- Invoke document-level orchestration graph ----
-        document_graph.invoke({
-            "document_id": document.id,
-            "claim_id": claim.id,
-            "document_status": document.status
-        })
-
     except Exception as e:
         # ---- Extraction failure ----
         document.status = "EXTRACTION_FAILED"

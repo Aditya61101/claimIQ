@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,8 @@ from app.models.policies import Policy
 from app.models.insured_persons import InsuredPerson
 # helpers
 from app.utils.constants import UserRoles
+
+from app.orchestration.document.document_executor import invoke_document_graph
 
 router = APIRouter(prefix='/claims', tags=['Claims'])
 
@@ -130,4 +132,46 @@ def get_claims(
         status=True,
         message='Claims fetched successfully',
         data=claims
+    )
+
+# TODO: make it idempotent
+@router.post("/{claim_id}/process")
+def claim_processing(
+    claim_id:int, 
+    background_tasks: BackgroundTasks,
+    db:Session = Depends(get_db),
+    current_user:User = Depends(require_roles("POLICY_HOLDER", "HOSPITAL"))
+):
+
+    claim = db.query(Claim).get(claim_id)
+    if not claim:
+        raise HTTPException(404, "Claim not found")
+    
+    # for authorization purpose, raises exception if claim is not owned by current user
+    assert_claim_access(claim, current_user)
+    
+    if claim.processing_status not in {"DRAFT", "ACTION_REQUIRED"}:
+        raise HTTPException(400, detail=f'Claim cannot be processed in state: {claim.processing_status}')
+    
+    # fetching documents for the given claim id
+    document_ids = db.query(Document.id).filter(Document.claim_id==claim_id, Document.status.in_(['UPLOADED', 'EXTRACTED'])).all()
+
+    if not document_ids:
+        raise HTTPException(400, "No documents uploaded")
+    
+    claim.processing_status = 'DOCUMENT_PROCESSING'
+    db.commit()
+
+    # parallel document graph execution for each document available
+    # TODO: replace this with a task queue
+    for (document_id, ) in document_ids:
+        background_tasks.add_task(
+            invoke_document_graph,
+            document_id,
+            claim_id
+        )
+
+    return APIResponse(
+        status=True,
+        message='Claim sent for processing',
     )

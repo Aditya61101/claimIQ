@@ -51,3 +51,18 @@ Common alembic commands:
 - alembic heads: show the current head revisions
 - alembic branches: show the current branches in the migration history
 - alembic stamp head: mark the database as up-to-date without applying migrations (useful for initial setup)
+
+Theoretical (HTTP semantics): -
+In case of process claim endpoint, We must use POST because:
+1. The endpoint mutates backend state
+2. It triggers side effects (background tasks, AI workflows, DB updates)
+3. GET must be safe and side-effect free, and this endpoint is not.
+
+Practical (real-world systems): -
+POST is required because GET requests:
+1. May be cached by browsers, CDNs, or reverse proxies
+2. May be auto-invoked by:
+   browser prefetching
+   link previews (Slack, WhatsApp, email clients)
+   crawlers and bots
+3. May be retried automatically without user intent
