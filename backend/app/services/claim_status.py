@@ -55,7 +55,7 @@ def derive_processing_status(claim:Claim, db: Session) -> str:
         return "ACTION_REQUIRED", build_action_required_payload(documents)
 
     # Every document verified successfully, so we moved to claim level agents
-    if statuses == {"VERIFIED"}:
+    if "VERIFIED" in statuses:
         return "READY_FOR_EVALUATION", None
 
     # Still processing
